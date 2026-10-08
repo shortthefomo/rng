@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RNG dice</title>
+<style>
+  :root {
+    --felt: #0e3d30;
+    --felt-deep: #08261e;
+    --cream: #f3ead7;
+    --ink: #1b140c;
+    --gold: #e7c36a;
+    --loss: #f0b4a0;
+    --win: #d7f2c2;
+    --muted: #c9deD2;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; }
+  body {
+    font-family: "Iowan Old Style", Palatino, Georgia, serif;
+    color: var(--cream);
+    background:
+      radial-gradient(ellipse at 50% 0%, #1a6b4a 0%, transparent 55%),
+      radial-gradient(circle at 20% 80%, #14553c 0%, transparent 40%),
+      var(--felt-deep);
+  }
+  main {
+    max-width: 880px;
+    margin: 0 auto;
+    padding: 28px 16px 48px;
+  }
+  h1 {
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    margin: 0 0 6px;
+    font-size: 2rem;
+  }
+  .lede { margin: 0 0 22px; max-width: 62ch; color: var(--muted); line-height: 1.45; }
+  .table {
+    background:
+      radial-gradient(circle at 50% 30%, rgba(255,255,255,0.05), transparent 50%),
+      linear-gradient(#146349, var(--felt));
+    border: 10px solid #6b3f22;
+    border-radius: 28px;
+    box-shadow: inset 0 0 0 3px #c9a06a, 0 18px 40px rgba(0,0,0,.35);
+    padding: 22px 18px 18px;
+  }
+  .board-row {
+    display: flex;
+    gap: 22px;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .result-wrap { text-align: center; }
+  .result-wrap p { margin: 8px 0 0; font-size: 0.95rem; color: var(--gold); min-height: 1.2em; }
+  .die {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    background: linear-gradient(#fffaf2, #e7dcc6);
+    border-radius: 16px;
+    padding: 8px;
+    box-shadow: inset 0 0 0 2px #c8b89a, 0 8px 16px rgba(0,0,0,.28);
+  }
+  .die i {
+    width: 14px;
+    height: 14px;
+    margin: auto;
+    border-radius: 50%;
+    background: var(--ink);
+    opacity: 0;
+  }
+  .die[data-face="1"] i:nth-child(5),
+  .die[data-face="2"] i:nth-child(1),
+  .die[data-face="2"] i:nth-child(9),
+  .die[data-face="3"] i:nth-child(1),
+  .die[data-face="3"] i:nth-child(5),
+  .die[data-face="3"] i:nth-child(9),
+  .die[data-face="4"] i:nth-child(1),
+  .die[data-face="4"] i:nth-child(3),
+  .die[data-face="4"] i:nth-child(7),
+  .die[data-face="4"] i:nth-child(9),
+  .die[data-face="5"] i:nth-child(1),
+  .die[data-face="5"] i:nth-child(3),
+  .die[data-face="5"] i:nth-child(5),
+  .die[data-face="5"] i:nth-child(7),
+  .die[data-face="5"] i:nth-child(9),
+  .die[data-face="6"] i:nth-child(1),
+  .die[data-face="6"] i:nth-child(3),
+  .die[data-face="6"] i:nth-child(4),
+  .die[data-face="6"] i:nth-child(6),
+  .die[data-face="6"] i:nth-child(7),
+  .die[data-face="6"] i:nth-child(9) { opacity: 1; }
+  #result {
+    width: 148px;
+    height: 148px;
+    position: relative;
+  }
+  #result i { width: 22px; height: 22px; }
+  #result .q {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    font-size: 4rem;
+    color: var(--ink);
+    font-family: Georgia, serif;
+  }
+  #result[data-known="1"] .q { display: none; }
+  #result.rolling { animation: roll .16s linear infinite; }
+  @keyframes roll { to { transform: rotate(1turn); } }
+  .faces { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+  .face {
+    width: 72px;
+    height: auto;
+    padding: 6px 4px 2px;
+    border: 0;
+    border-radius: 16px;
+    background: transparent;
+    cursor: pointer;
+    opacity: 0.4;
+  }
+  .face .die { width: 64px; height: 64px; margin: 0 auto; }
+  .face[aria-pressed="true"] { opacity: 1; background: rgba(231, 195, 106, 0.16); }
+  .face[aria-pressed="true"] .die {
+    box-shadow: inset 0 0 0 2px #c8b89a, 0 0 0 6px var(--gold);
+    transform: translateY(-6px) scale(1.08);
+  }
+  .face .pick {
+    display: none;
+    margin-top: 8px;
+    color: var(--gold);
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+  }
+  .face[aria-pressed="true"] .pick { display: block; }
+  label { display: block; margin: 18px 0 6px; color: var(--muted); font-size: 0.92rem; }
+  input[type="text"] {
+    width: 100%;
+    font: 16px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid #2f6b54;
+    background: #072018;
+    color: var(--cream);
+  }
+  .bet-row { display: flex; align-items: center; gap: 12px; }
+  input[type="range"] { flex: 1; accent-color: var(--gold); }
+  #amount {
+    min-width: 9ch;
+    text-align: right;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+  button.act {
+    font: 600 1rem/1 "Iowan Old Style", Palatino, Georgia, serif;
+    background: var(--gold);
+    color: var(--ink);
+    border: 0;
+    border-radius: 999px;
+    padding: 12px 18px;
+    cursor: pointer;
+  }
+  button.act.ghost { background: transparent; color: var(--cream); box-shadow: inset 0 0 0 1px #d7c091; }
+  button.act:disabled { opacity: 0.45; cursor: default; }
+  .sign {
+    margin-top: 14px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.92rem;
+  }
+  .totals { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+  .wallet { font-size: 1.35rem; margin: 0 0 8px; }
+  .wallet.house { text-align: right; }
+  .wallet b.up { color: var(--win); }
+  .wallet b.down { color: var(--loss); }
+  .cmd-wrap { margin-top: 16px; }
+  .meta { min-width: 220px; }
+  .meta a { color: var(--gold); }
+  pre {
+    white-space: pre-wrap;
+    word-break: break-all;
+    background: #072018;
+    border-radius: 10px;
+    padding: 10px;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+  #status { font-size: 1.15rem; margin: 8px 0; min-height: 1.4em; }
+  #status.win { color: var(--win); }
+  #status.loss { color: var(--loss); }
+  #log { margin: 8px 0 0; padding-left: 18px; color: var(--muted); }
+  #log a { color: var(--gold); }
+  .note { margin-top: 18px; color: var(--muted); font-size: 0.92rem; line-height: 1.45; }
+  .note a { color: var(--gold); }
+  @media (max-width: 640px) {
+    h1 { font-size: 1.6rem; }
+    #result { width: 120px; height: 120px; }
+    .face { width: 58px; }
+    .face .die { width: 48px; height: 48px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>RNG dice</h1>
+  <p class="lede">Guess a face, escrow up to 10 XAH, and let the hook roll. The funds lock before <code>dice()</code> runs. A loss finishes the escrow into the pot. A win cancels it and the pot pays the same amount back.</p>
+  <div class="table">
+    <div class="board-row">
+      <div class="result-wrap">
+        <div id="result" class="die" data-face="0" data-known="0" aria-hidden="true">
+          <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+          <span class="q">?</span>
+        </div>
+        <p id="result-label">No roll yet</p>
+      </div>
+      <div class="faces" id="faces" role="group" aria-label="Guess"></div>
+    </div>
+    <div class="totals">
+      <p id="wallet" class="wallet">You <b id="wallet-amt">…</b></p>
+      <p class="wallet house">House <b id="house-amt">…</b></p>
+    </div>
+    <label for="bet">Bet <span id="amount">1.0 XAH</span></label>
+    <div class="bet-row">
+      <input id="bet" type="range" min="1" max="100" step="1" value="10">
+    </div>
+    <p id="drops" class="sign">1000000 drops</p>
+    <label for="account">Hook account</label>
+    <input id="account" type="text" spellcheck="false" autocomplete="off" placeholder="r…">
+    <div class="actions">
+      <button class="act" id="show" type="button">Place bet</button>
+    </div>
+    <p id="clock" class="sign" data-clock="wall"></p>
+    <div class="cmd-wrap" id="cmd-wrap">
+      <div class="meta">
+        <p id="status" aria-live="polite"></p>
+        <pre id="txjson"></pre>
+        <ol id="log"></ol>
+      </div>
+    </div>
+  </div>
+  <p class="note">This page signs the bet and submits it on <code>wss://rng.xahau-dev.net</code>, network id 21339. The root devnet uses the same id and does not have <a href="https://github.com/Xahau/xahaud/pull/869">featureRNG</a>. A loss can finish 20 seconds after the bet. A win pays 20 seconds after that. The die spins until that face is known. One bet at a time. You is the player balance. House is the pot, on the right. Both turn green when they rise and red when they fall. The picked die lifts and is ringed in gold.</p>
+</main>
+<script src="bet-sign.js"></script>
+<script>
+const WSS = "wss://rng.xahau-dev.net";
+const EXPLORER = "https://explorer.rng.xahau-dev.net";
+const RIPPLE = 946684800;
+
+const faces = document.getElementById("faces");
+const bet = document.getElementById("bet");
+const amount = document.getElementById("amount");
+const dropsEl = document.getElementById("drops");
+const account = document.getElementById("account");
+const show = document.getElementById("show");
+const clockEl = document.getElementById("clock");
+const txjson = document.getElementById("txjson");
+const statusEl = document.getElementById("status");
+const logEl = document.getElementById("log");
+const result = document.getElementById("result");
+const resultLabel = document.getElementById("result-label");
+
+let guess = 1;
+let ledgerClose = null;
+let clockSource = "wall";
+let since = 0;
+let balAt = 0;
+let prevBal = 0;
+let prevHouse = 0;
+let till = 0;
+let held = false;
+let ws = null;
+let watchTimer = 0;
+let rpcN = 10;
+const waits = new Map();
+const seen = new Set();
+
+function die() {
+  const node = document.createElement("span");
+  node.className = "die";
+  node.innerHTML = "<i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>";
+  return node;
+}
+
+for (let n = 1; n <= 6; n++) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "face";
+  button.dataset.face = String(n);
+  button.setAttribute("aria-pressed", n === 1 ? "true" : "false");
+  button.setAttribute("aria-label", "Face " + n);
+  const face = die();
+  face.dataset.face = String(n);
+  const mark = document.createElement("span");
+  mark.className = "pick";
+  mark.textContent = "picked";
+  button.append(face, mark);
+  button.addEventListener("click", () => {
+    guess = n;
+    for (const other of faces.querySelectorAll(".face"))
+      other.setAttribute("aria-pressed", other === button ? "true" : "false");
+  });
+  faces.append(button);
+}
+
+function tenths() {
+  const n = Math.round(Number(bet.value));
+  if (!Number.isFinite(n)) return 10;
+  return Math.min(100, Math.max(1, n));
+}
+
+function drops() {
+  return tenths() * 100000;
+}
+
+function validAccount(value) {
+  return /^r[1-9A-HJ-NP-Za-km-z]{24,34}$/.test(value);
+}
+
+function rippleNow() {
+  return ledgerClose ?? (Math.floor(Date.now() / 1000) - RIPPLE);
+}
+
+function noteClock() {
+  clockEl.dataset.clock = clockSource;
+  clockEl.textContent = clockSource === "ledger"
+    ? "Times follow the validated ledger."
+    : "Times follow this computer's clock.";
+}
+
+function paintWait() {
+  if (!till || held) return;
+  const n = till - rippleNow();
+  statusEl.className = "";
+  statusEl.textContent = n > 0 ? "Escrow created. " + n + "s" : "Escrow created.";
+}
+
+let rollTimer = 0;
+function startRoll() {
+  clearInterval(rollTimer);
+  result.classList.add("rolling");
+  result.dataset.known = "1";
+  let n = 0;
+  rollTimer = setInterval(() => {
+    if (held || !result.classList.contains("rolling")) return;
+    n = n % 6 + 1;
+    result.dataset.face = String(n);
+  }, 90);
+}
+function stopRoll(keep) {
+  clearInterval(rollTimer);
+  result.classList.remove("rolling");
+  if (keep) return;
+  result.dataset.face = "0";
+  result.dataset.known = "0";
+}
+
+function paintAmount() {
+  const xah = (tenths() / 10).toFixed(1);
+  amount.textContent = xah + " XAH";
+  dropsEl.textContent = String(drops()) + " drops";
+}
+
+function paintMoney(id, v, prev) {
+  const n = Number(v);
+  const el = document.getElementById(id);
+  el.textContent = (n / 1e6).toFixed(2) + " XAH";
+  if (prev && n !== prev) el.className = n > prev ? "up" : "down";
+  return n;
+}
+function showBal(v) {
+  prevBal = paintMoney("wallet-amt", v, prevBal);
+}
+function showHouse(v) {
+  prevHouse = paintMoney("house-amt", v, prevHouse);
+}
+
+function rpc(body) {
+  return new Promise((resolve, reject) => {
+    if (!ws || ws.readyState !== 1) {
+      reject(new Error("offline"));
+      return;
+    }
+    const id = ++rpcN;
+    const timer = setTimeout(() => {
+      waits.delete(id);
+      reject(new Error("timeout"));
+    }, 8000);
+    waits.set(id, (msg) => {
+      clearTimeout(timer);
+      resolve(msg);
+    });
+    ws.send(JSON.stringify({ ...body, id }));
+  });
+}
+
+bet.addEventListener("input", () => paintAmount());
+account.addEventListener("input", () => {
+  try { localStorage.setItem("rng-hook-account", account.value.trim()); } catch { /* ignore */ }
+});
+
+show.addEventListener("click", async () => {
+  const dest = account.value.trim();
+  statusEl.className = "";
+  if (dest !== rngPot) {
+    statusEl.textContent = "This demo signs only to the pot.";
+    return;
+  }
+  held = false;
+  till = 0;
+  startRoll();
+  statusEl.textContent = "Signing.";
+  let info, led;
+  try {
+    info = await rpc({ command: "account_info", account: rngPlayer, ledger_index: "current" });
+    led = await rpc({ command: "ledger", ledger_index: "validated" });
+  } catch {
+    stopRoll();
+    statusEl.textContent = "Not connected.";
+    return;
+  }
+  const seq = info.result?.account_data?.Sequence;
+  const index = led.result?.ledger?.ledger_index;
+  const closeT = led.result?.ledger?.close_time || rippleNow();
+  if (!seq || !index) {
+    stopRoll();
+    statusEl.textContent = "No ledger.";
+    return;
+  }
+  const start = closeT + 20;
+  let blob;
+  try {
+    blob = await rngSign({
+      Amount: String(drops()),
+      DestinationTag: guess,
+      FinishAfter: start,
+      CancelAfter: start + 20,
+      Sequence: seq,
+      Fee: "50000",
+      LastLedgerSequence: index + 40,
+    });
+  } catch {
+    stopRoll();
+    statusEl.textContent = "Sign failed.";
+    return;
+  }
+  let sub;
+  try {
+    sub = await rpc({ command: "submit", tx_blob: blob });
+  } catch {
+    stopRoll();
+    statusEl.textContent = "Submit failed.";
+    return;
+  }
+  const out = sub.result || {};
+  const code = out.engine_result || out.error || "sent";
+  txjson.textContent = out.tx_json?.hash || "";
+  if (String(code).startsWith("tes")) {
+    held = false;
+    till = start + 20;
+    paintWait();
+  } else {
+    till = 0;
+    stopRoll();
+    statusEl.className = "";
+    statusEl.textContent = code + (out.engine_result_message ? " " + out.engine_result_message : "");
+  }
+  since = index;
+  watchAccount();
+});
+setInterval(paintWait, 1000);
+
+function hookText(ex) {
+  let text = ex.HookReturnString || "";
+  if (/^[0-9A-Fa-f]+$/.test(text) && text.length % 2 === 0) {
+    const bytes = new Uint8Array(text.length / 2);
+    for (let i = 0; i < bytes.length; i++) bytes[i] = parseInt(text.slice(i * 2, i * 2 + 2), 16);
+    text = new TextDecoder().decode(bytes);
+  }
+  return text.replace(/\0+$/, "");
+}
+
+function say(text) {
+  const face = /^face=([1-6]) (win|loss|refund)$/.exec(text);
+  const quiet = text === "idle" || text === "wait" || text === "locked" || text === "armed" ||
+    text === "done" || text === "inflight" || text === "paid";
+  if (face) {
+    held = true;
+    till = 0;
+    stopRoll(true);
+    statusEl.className = "";
+    const n = face[1];
+    const kind = face[2];
+    result.dataset.face = n;
+    result.dataset.known = "1";
+    resultLabel.textContent = "Face " + n;
+    statusEl.classList.add(kind === "loss" ? "loss" : "win");
+    statusEl.textContent = kind === "win"
+      ? "Face " + n + ". You guessed it. The stake returns after the cancel time, then the pot pays the same amount."
+      : kind === "loss"
+        ? "Face " + n + ". The escrow finished into the pot."
+        : "Face " + n + ". The bet was cancelled and the pot paid no prize.";
+    return;
+  }
+  if (held || (till && quiet)) return;
+  const plain = {
+    locked: "Escrow is locked. The roll has not happened.",
+    armed: "The hook scheduled the roll.",
+    entropy: "This ledger does not have enough randomness yet. The hook will try again.",
+    wait: "The roll is chosen. Settlement waits for the escrow clock.",
+    paid: "The prize payment was sent.",
+    done: "This bet is settled.",
+    idle: "The table is empty.",
+    "pot short": "The pot cannot cover this bet.",
+    "table busy": "Another bet is still open.",
+    "max 10 xah": "The bet is above 10 XAH.",
+    "guess 1-6": "The guess has to be a face from 1 to 6.",
+    "time window": "The escrow times are outside the hook's window.",
+    "emit fail": "The hook will retry the payout.",
+    "pay fail": "The prize payment still needs a retry.",
+  };
+  if (!plain[text]) return;
+  if (!quiet) {
+    till = 0;
+    stopRoll();
+  }
+  statusEl.className = "";
+  statusEl.textContent = plain[text];
+}
+
+function executions(meta) {
+  const list = (meta && (meta.HookExecutions || meta.hook_executions)) || [];
+  return list.map((entry) => hookText(entry.HookExecution || entry)).filter(Boolean);
+}
+
+function ingest(tx, meta, hash, ledger) {
+  if (ledger && since && ledger <= since) return;
+  const id = hash || tx.hash || tx.Hash || "";
+  const texts = executions(meta);
+  if (!texts.length) return;
+  const key = id + "|" + texts.join(",");
+  if (seen.has(key)) return;
+  seen.add(key);
+  for (const text of texts) {
+    const item = document.createElement("li");
+    item.textContent = text + " ";
+    if (id) {
+      const link = document.createElement("a");
+      link.href = EXPLORER + "/tx/" + id;
+      link.textContent = id.slice(0, 8);
+      link.target = "_blank";
+      link.rel = "noopener";
+      item.append(link);
+    }
+    logEl.append(item);
+    say(text);
+  }
+}
+
+function ingestAccountTx(message) {
+  const rows = message.result?.transactions || [];
+  const ordered = rows.slice().reverse();
+  for (const row of ordered) {
+    const tx = row.tx || row.tx_json || row;
+    ingest(tx, row.meta || row.metadata, row.hash || tx.hash, row.ledger_index);
+  }
+}
+
+function watchAccount() {
+  if (!ws || ws.readyState !== 1 || !since) return;
+  ws.send(JSON.stringify({ command: "subscribe", accounts: [rngPot], id: 3 }));
+  ws.send(JSON.stringify({
+    command: "account_tx",
+    account: rngPot,
+    ledger_index_min: since,
+    ledger_index_max: -1,
+    limit: 20,
+    id: 4,
+  }));
+}
+
+function connect() {
+  if (location.search.includes("offline=1")) return;
+  try {
+    ws = new WebSocket(WSS);
+  } catch {
+    return;
+  }
+  ws.onopen = () => {
+    ws.send(JSON.stringify({ command: "ledger", ledger_index: "validated", id: 1 }));
+    ws.send(JSON.stringify({ command: "subscribe", streams: ["ledger"], id: 2 }));
+    if (since) watchAccount();
+  };
+  ws.onmessage = (ev) => {
+    let msg;
+    try { msg = JSON.parse(ev.data); } catch { return; }
+    if (msg.id && waits.has(msg.id)) {
+      const done = waits.get(msg.id);
+      waits.delete(msg.id);
+      done(msg);
+    }
+    const led = msg.result?.ledger;
+    const close = led?.close_time ?? msg.ledger_time;
+    if (typeof close === "number" && close > 1000000) {
+      ledgerClose = close;
+      clockSource = "ledger";
+      noteClock();
+    }
+    if (msg.id === 1 && led?.ledger_index && !since) {
+      since = led.ledger_index;
+      watchAccount();
+    }
+    const bal = msg.result?.account_data?.Balance;
+    if (bal && msg.id === 7) showBal(bal);
+    if (bal && msg.id === 8) showHouse(bal);
+    const idx = msg.ledger_index || led?.ledger_index;
+    if (idx && idx !== balAt && ws && ws.readyState === 1) {
+      balAt = idx;
+      ws.send(JSON.stringify({ command: "account_info", account: rngPlayer, ledger_index: "validated", id: 7 }));
+      ws.send(JSON.stringify({ command: "account_info", account: rngPot, ledger_index: "validated", id: 8 }));
+    }
+    if (msg.id === 4) ingestAccountTx(msg);
+    if (msg.transaction) ingest(msg.transaction, msg.meta || msg.metadata, msg.transaction.hash, msg.ledger_index);
+  };
+  ws.onclose = () => {
+    ws = null;
+    clearTimeout(watchTimer);
+    watchTimer = setTimeout(connect, 2000);
+  };
+}
+
+paintAmount();
+noteClock();
+
+let saved = "";
+try { saved = localStorage.getItem("rng-hook-account") || ""; } catch { saved = ""; }
+account.value = saved || rngPot;
+fetch("hook.json").then((res) => res.ok ? res.json() : null).then((data) => {
+  if (data && data.account && !account.value.trim()) account.value = data.account;
+}).catch(() => {});
+
+connect();
+
+window.__rng = {
+  drops,
+  get clock() { return clockSource; },
+  arm(t) {
+    held = false;
+    till = t;
+    paintWait();
+  },
+};
+</script>
+</body>
+</html>

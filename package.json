@@ -1,0 +1,19 @@
+{
+  "name": "xahau-rng-dice",
+  "private": true,
+  "type": "module",
+  "description": "featureRNG dice hook and the page that escrows a bet against it.",
+  "scripts": {
+    "build": "./build.sh",
+    "build:page": "node boot.mjs",
+    "test": "node test-devnet.mjs",
+    "test:page": "node test-page.mjs",
+    "publish": "node publish.mjs"
+  },
+  "dependencies": {
+    "xrpl-accountlib": "^9.3.2"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.12"
+  }
+}
